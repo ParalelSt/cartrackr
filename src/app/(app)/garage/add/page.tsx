@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { useVehicles } from "@/hooks/useVehicles";
@@ -16,7 +16,7 @@ const FUEL_TYPES = [
 
 export default function AddVehiclePage() {
   const router = useRouter();
-  const { addVehicle } = useVehicles();
+  const { addVehicle, vehicles, switchVehicle } = useVehicles();
 
   const [name, setName] = useState("");
   const [make, setMake] = useState("");
@@ -27,6 +27,8 @@ export default function AddVehiclePage() {
   >("petrol");
   const [odometer, setOdometer] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSwitchPrompt, setShowSwitchPrompt] = useState(false);
+  const newVehicleRef = useRef<{ id: string } | null>(null);
 
   const isValid =
     name.trim().length > 0 &&
@@ -40,15 +42,30 @@ export default function AddVehiclePage() {
     if (!isValid || isSubmitting) return;
     setIsSubmitting(true);
 
-    addVehicle({
+    const hasExisting = vehicles.length > 0;
+    const vehicle = addVehicle({
       name: name.trim(),
       make: make.trim(),
       model: model.trim(),
       year: parseInt(year),
       fuelType,
-      odometer: parseFloat(odometer) || 0,
+      odometer: parseFloat(odometer.replace(",", ".")) || 0,
     });
 
+    if (hasExisting) {
+      newVehicleRef.current = vehicle;
+      setShowSwitchPrompt(true);
+      setIsSubmitting(false);
+    } else {
+      router.push("/garage");
+    }
+  };
+
+  const handleSwitchResponse = (switchToNew: boolean) => {
+    if (switchToNew && newVehicleRef.current) {
+      switchVehicle(newVehicleRef.current.id);
+    }
+    setShowSwitchPrompt(false);
     router.push("/garage");
   };
 
@@ -59,10 +76,10 @@ export default function AddVehiclePage() {
           <button
             type="button"
             onClick={() => router.back()}
-            className="rounded-xl p-1 transition-colors hover:bg-white/15"
+            className="-ml-2 rounded-xl p-1.5 transition-colors hover:bg-white/15"
             aria-label="Go back"
           >
-            <ChevronLeft size={24} className="text-white" />
+            <ChevronLeft size={22} className="text-white" />
           </button>
           <h1 className="text-xl font-extrabold text-white">Add Vehicle</h1>
         </div>
@@ -181,6 +198,36 @@ export default function AddVehiclePage() {
           Save Vehicle
         </button>
       </form>
+
+      {/* Switch active vehicle prompt */}
+      {showSwitchPrompt ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-6">
+          <div className="w-full max-w-xs rounded-2xl bg-white p-6 shadow-xl">
+            <h2 className="text-base font-bold text-[var(--color-text)]">
+              Switch active vehicle?
+            </h2>
+            <p className="mt-1.5 text-sm text-[var(--color-text-muted)]">
+              Do you want to make <span className="font-semibold">{name.trim()}</span> your active vehicle?
+            </p>
+            <div className="mt-5 flex gap-3">
+              <button
+                type="button"
+                onClick={() => handleSwitchResponse(false)}
+                className="flex-1 rounded-xl border border-[var(--color-border)] py-3 text-sm font-semibold text-[var(--color-text-secondary)] transition-colors hover:bg-gray-50 active:scale-[0.98]"
+              >
+                Keep current
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSwitchResponse(true)}
+                className="flex-1 rounded-xl bg-[var(--color-primary)] py-3 text-sm font-bold text-white transition-all hover:bg-[var(--color-primary-light)] active:scale-[0.98]"
+              >
+                Switch
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

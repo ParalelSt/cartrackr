@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useUser } from "@auth0/nextjs-auth0/client";
 import {
   Heart,
@@ -9,6 +10,7 @@ import {
   Bell,
   Smartphone,
   BarChart3,
+  Download,
   LogOut,
   User,
 } from "lucide-react";
@@ -75,14 +77,15 @@ export default function ProfilePage() {
             Account
           </h2>
           {[
-            { label: "Account Settings", icon: Settings },
-            { label: "Notification Settings", icon: Bell },
-            { label: "Connected Devices", icon: Smartphone },
-            { label: "Usage Statistics", icon: BarChart3 },
+            { label: "Account Settings", icon: Settings, href: "/profile/settings" },
+            { label: "Notifications", icon: Bell, href: "/profile/notifications" },
+            { label: "Usage Statistics", icon: BarChart3, href: "/profile/stats" },
+            { label: "Connected Devices", icon: Smartphone, href: "/profile/devices" },
           ].map((item) => (
-            <div
+            <Link
               key={item.label}
-              className="flex items-center gap-3 border-t border-[var(--color-border)] px-4 py-3.5"
+              href={item.href}
+              className="flex items-center gap-3 border-t border-[var(--color-border)] px-4 py-3.5 transition-colors hover:bg-gray-50"
             >
               <item.icon
                 size={18}
@@ -93,8 +96,37 @@ export default function ProfilePage() {
                 size={16}
                 className="text-[var(--color-text-muted)]"
               />
-            </div>
+            </Link>
           ))}
+        </div>
+
+        {/* Install PWA prompt */}
+        <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
+          <h2 className="px-4 pb-1 pt-4 text-[11px] font-bold uppercase tracking-widest text-[var(--color-text-muted)]">
+            App
+          </h2>
+          <button
+            type="button"
+            onClick={() => {
+              alert(
+                "To install CarTrackr:\n\n" +
+                "Android: Tap the menu (three dots) → 'Add to Home screen'\n\n" +
+                "iOS: Tap the Share button → 'Add to Home Screen'\n\n" +
+                "Desktop: Click the install icon in your browser's address bar"
+              );
+            }}
+            className="flex w-full items-center gap-3 border-t border-[var(--color-border)] px-4 py-3.5 transition-colors hover:bg-gray-50"
+          >
+            <Download
+              size={18}
+              className="shrink-0 text-[var(--color-primary)]"
+            />
+            <span className="flex-1 text-left text-sm font-medium">Install App</span>
+            <ChevronRight
+              size={16}
+              className="text-[var(--color-text-muted)]"
+            />
+          </button>
         </div>
 
         {/* Support section */}

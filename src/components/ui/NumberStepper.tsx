@@ -25,7 +25,10 @@ export default function NumberStepper({
   unit,
   unitPosition = "right",
 }: Props) {
-  const numValue = parseFloat(value) || 0;
+  /** Parse a string that may use comma or dot as decimal separator */
+  const parse = (v: string) => parseFloat(v.replace(",", ".")) || 0;
+
+  const numValue = parse(value);
 
   const handleIncrement = () => {
     const next = Math.round((numValue + step) * 1000) / 1000;
@@ -37,6 +40,12 @@ export default function NumberStepper({
     if (next >= min) {
       onChange(String(next));
     }
+  };
+
+  const handleChange = (raw: string) => {
+    // Allow digits, dots, commas, and empty string while typing
+    const cleaned = raw.replace(/[^0-9.,]/g, "");
+    onChange(cleaned);
   };
 
   const hasLeftUnit = unit && unitPosition === "left";
@@ -67,10 +76,10 @@ export default function NumberStepper({
           ) : null}
           <input
             id={id}
-            type="number"
+            type="text"
             inputMode="decimal"
             value={value}
-            onChange={(e) => onChange(e.target.value)}
+            onChange={(e) => handleChange(e.target.value)}
             placeholder={placeholder}
             className={`w-full rounded-xl border border-[var(--color-border)] py-2.5 text-center text-sm font-semibold outline-none transition-colors focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary)]/20 ${
               hasLeftUnit ? "pl-7 pr-3" : hasRightUnit ? "pl-3 pr-10" : "px-3"

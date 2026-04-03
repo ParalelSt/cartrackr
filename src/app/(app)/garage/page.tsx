@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useVehicles } from "@/hooks/useVehicles";
 import {
@@ -17,6 +18,12 @@ export default function GaragePage() {
     removeVehicle,
     switchVehicle,
   } = useVehicles();
+
+  const [switchPromptId, setSwitchPromptId] = useState<string | null>(null);
+  const [deletePromptId, setDeletePromptId] = useState<string | null>(null);
+
+  const switchTarget = vehicles.find((v) => v.id === switchPromptId);
+  const deleteTarget = vehicles.find((v) => v.id === deletePromptId);
 
   const FUEL_TYPE_LABELS = {
     petrol: "Petrol",
@@ -72,7 +79,9 @@ export default function GaragePage() {
                 >
                   <button
                     type="button"
-                    onClick={() => switchVehicle(vehicle.id)}
+                    onClick={() => {
+                      if (!isActive) setSwitchPromptId(vehicle.id);
+                    }}
                     className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-colors ${
                       isActive
                         ? "bg-[var(--color-primary)] text-white"
@@ -105,7 +114,7 @@ export default function GaragePage() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => removeVehicle(vehicle.id)}
+                    onClick={() => setDeletePromptId(vehicle.id)}
                     className="shrink-0 rounded-xl p-2 text-[var(--color-text-muted)] transition-colors hover:bg-red-50 hover:text-[var(--color-danger)]"
                     aria-label={`Delete ${vehicle.name}`}
                   >
@@ -117,6 +126,72 @@ export default function GaragePage() {
           )}
         </div>
       </div>
+
+      {/* Switch vehicle prompt */}
+      {switchTarget ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-6">
+          <div className="w-full max-w-xs rounded-2xl bg-white p-6 shadow-xl">
+            <h2 className="text-base font-bold text-[var(--color-text)]">
+              Switch vehicle?
+            </h2>
+            <p className="mt-1.5 text-sm text-[var(--color-text-muted)]">
+              Make <span className="font-semibold">{switchTarget.name}</span> your active vehicle?
+            </p>
+            <div className="mt-5 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setSwitchPromptId(null)}
+                className="flex-1 rounded-xl border border-[var(--color-border)] py-3 text-sm font-semibold text-[var(--color-text-secondary)] transition-colors hover:bg-gray-50 active:scale-[0.98]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  switchVehicle(switchTarget.id);
+                  setSwitchPromptId(null);
+                }}
+                className="flex-1 rounded-xl bg-[var(--color-primary)] py-3 text-sm font-bold text-white transition-all hover:bg-[var(--color-primary-light)] active:scale-[0.98]"
+              >
+                Switch
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Delete vehicle prompt */}
+      {deleteTarget ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-6">
+          <div className="w-full max-w-xs rounded-2xl bg-white p-6 shadow-xl">
+            <h2 className="text-base font-bold text-[var(--color-text)]">
+              Delete vehicle?
+            </h2>
+            <p className="mt-1.5 text-sm text-[var(--color-text-muted)]">
+              Remove <span className="font-semibold">{deleteTarget.name}</span> and all its fuel logs? This can&apos;t be undone.
+            </p>
+            <div className="mt-5 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setDeletePromptId(null)}
+                className="flex-1 rounded-xl border border-[var(--color-border)] py-3 text-sm font-semibold text-[var(--color-text-secondary)] transition-colors hover:bg-gray-50 active:scale-[0.98]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  removeVehicle(deleteTarget.id);
+                  setDeletePromptId(null);
+                }}
+                className="flex-1 rounded-xl bg-[var(--color-danger)] py-3 text-sm font-bold text-white transition-all hover:bg-red-700 active:scale-[0.98]"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

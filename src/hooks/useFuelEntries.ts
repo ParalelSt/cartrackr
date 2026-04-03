@@ -1,6 +1,6 @@
 "use client";
 
-import { useSyncExternalStore, useCallback } from "react";
+import { useSyncExternalStore, useCallback, useMemo } from "react";
 import {
   getFuelEntries,
   saveFuelEntry,
@@ -9,6 +9,7 @@ import {
   calculateFuelStats,
   type FuelEntry,
 } from "@/lib/fuelStorage";
+import { getActiveVehicleId } from "@/lib/vehicleStorage";
 
 let version = 0;
 const listeners = new Set<() => void>();
@@ -39,7 +40,17 @@ export function useFuelEntries() {
   );
 
   const isLoaded = snapshot >= 0;
-  const entries = isLoaded ? getFuelEntries() : [];
+  const allEntries = isLoaded ? getFuelEntries() : [];
+  const activeVehicleId = isLoaded ? getActiveVehicleId() : null;
+
+  // Filter entries for the active vehicle
+  const entries = useMemo(
+    () =>
+      activeVehicleId
+        ? allEntries.filter((e) => e.vehicleId === activeVehicleId)
+        : allEntries,
+    [allEntries, activeVehicleId],
+  );
 
   const addEntry = useCallback(
     (data: Omit<FuelEntry, "id" | "pricePerLiter">) => {
@@ -62,5 +73,5 @@ export function useFuelEntries() {
 
   const stats = calculateFuelStats(entries);
 
-  return { entries, stats, isLoaded, addEntry, removeEntry };
+  return { entries, allEntries, stats, isLoaded, addEntry, removeEntry };
 }

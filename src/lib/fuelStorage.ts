@@ -3,6 +3,7 @@ import { z } from "zod";
 /** Schema for a single fuel log entry */
 export const fuelEntrySchema = z.object({
   id: z.string(),
+  vehicleId: z.string().optional(),
   date: z.string(),
   odometer: z.number().positive(),
   liters: z.number().positive(),
@@ -14,6 +15,26 @@ export const fuelEntrySchema = z.object({
 export type FuelEntry = z.infer<typeof fuelEntrySchema>;
 
 const STORAGE_KEY = "cartrackr_fuel_entries";
+const MIGRATED_KEY = "cartrackr_fuel_migrated_v1";
+
+/** Assign legacy entries (no vehicleId) to the given vehicle */
+export function migrateOrphanedEntries(vehicleId: string): void {
+  if (typeof window === "undefined") return;
+  if (localStorage.getItem(MIGRATED_KEY)) return;
+
+  const entries = getFuelEntries();
+  let changed = false;
+  for (const entry of entries) {
+    if (!entry.vehicleId) {
+      entry.vehicleId = vehicleId;
+      changed = true;
+    }
+  }
+  if (changed) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+  }
+  localStorage.setItem(MIGRATED_KEY, "1");
+}
 
 /** Read all fuel entries from localStorage */
 export function getFuelEntries(): FuelEntry[] {

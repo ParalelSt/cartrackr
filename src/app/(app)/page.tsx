@@ -1,8 +1,13 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { useFuelEntries } from "@/hooks/useFuelEntries";
 import { useVehicles } from "@/hooks/useVehicles";
+import { useSettings } from "@/hooks/useSettings";
+import { checkAndFireFuelReminder, checkWeekendReminder } from "@/lib/notifications";
+import { migrateOrphanedEntries } from "@/lib/fuelStorage";
+import { getCurrency } from "@/lib/currencies";
 import {
   Plus,
   ChevronRight,
@@ -26,23 +31,21 @@ function StatCard({
   icon: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center gap-3 rounded-2xl bg-white p-4 shadow-sm">
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-[var(--color-primary)]">
+    <div className="rounded-2xl bg-white p-4 shadow-sm">
+      <div className="mb-2 flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-[var(--color-primary)]">
         {icon}
       </div>
-      <div className="min-w-0">
-        <p className="text-[11px] font-medium text-[var(--color-text-muted)]">
-          {label}
-        </p>
-        <p className="text-lg font-extrabold leading-tight tracking-tight">
-          {value}
-          {unit ? (
-            <span className="ml-0.5 text-xs font-medium text-[var(--color-text-muted)]">
-              {unit}
-            </span>
-          ) : null}
-        </p>
-      </div>
+      <p className="text-[11px] font-medium text-[var(--color-text-muted)]">
+        {label}
+      </p>
+      <p className="mt-0.5 text-lg font-extrabold leading-tight tracking-tight">
+        {value}
+        {unit ? (
+          <span className="ml-0.5 text-[10px] font-medium text-[var(--color-text-muted)]">
+            {unit}
+          </span>
+        ) : null}
+      </p>
     </div>
   );
 }
@@ -51,24 +54,47 @@ export default function DashboardPage() {
   const { entries, stats, isLoaded } = useFuelEntries();
   const { activeVehicle, vehicles, isLoaded: vehiclesLoaded } = useVehicles();
 
+  const { settings } = useSettings();
+  const cur = getCurrency(settings.currency);
+  const distUnit = settings.distanceUnit;
+  const volUnit = settings.volumeUnit;
+  const isMetric = distUnit === "km" && volUnit === "L";
+  const consumptionLabel = isMetric ? "L/100km" : "MPG";
+
+  const formatConsumption = (lPer100km: number) => {
+    if (lPer100km <= 0) return "—";
+    if (!isMetric) return (235.215 / lPer100km).toFixed(1);
+    return lPer100km.toFixed(1);
+  };
+
   const recentEntries = entries.slice(0, 3);
   const isReady = isLoaded && vehiclesLoaded;
 
   const needsVehicle = isReady && vehicles.length === 0;
+
+  // Migrate old fuel entries (no vehicleId) to the first vehicle
+  useEffect(() => {
+    if (!isReady || vehicles.length === 0) return;
+    migrateOrphanedEntries(vehicles[0].id);
+  }, [isReady, vehicles]);
+
+  // Check fuel reminder on load
+  useEffect(() => {
+    if (!isReady || !settings.notificationsEnabled || !settings.fuelReminder) return;
+    const lastEntry = entries[0];
+    checkAndFireFuelReminder(
+      lastEntry?.date ?? null,
+      settings.fuelReminderDays,
+    );
+    checkWeekendReminder(entries.length > 0);
+  }, [isReady, settings, entries]);
 
   return (
     <div className="mx-auto max-w-lg">
       {/* Header */}
       <header className="bg-[var(--color-primary)] px-5 pb-5 pt-14">
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-extrabold text-white">Dashboard</h1>
-            {activeVehicle ? (
-              <p className="mt-0.5 text-sm font-medium text-white/70">
-                {activeVehicle.name}
-              </p>
-            ) : null}
-          </div>
+          <h1 className="text-xl font-extrabold text-white">Dashboard</h1>
           <a
             href="https://ko-fi.com/aronm"
             target="_blank"
@@ -79,6 +105,11 @@ export default function DashboardPage() {
             Support
           </a>
         </div>
+        {activeVehicle ? (
+          <p className="mt-1 text-sm font-medium text-white/60">
+            {activeVehicle.name}
+          </p>
+        ) : null}
       </header>
 
       <div className="mt-4 space-y-4 px-5">
@@ -109,26 +140,26 @@ export default function DashboardPage() {
         {/* Stats grid */}
         <div className="grid grid-cols-2 gap-3">
           <StatCard
-            label="Cost per km"
-            value={!isReady ? "—" : `$${stats.costPerKm.toFixed(2)}`}
-            unit="/km"
-            icon={<DollarSign size={20} />}
+            label={`Cost per ${distUnit}`}
+            value={!isReady ? "—" : `${cur.symbol}${stats.costPerKm.toFixed(2)}`}
+            unit={`/${distUnit}`}
+            icon={<DollarSign size={16} />}
           />
           <StatCard
             label="Total Spent"
-            value={!isReady ? "—" : `$${stats.totalSpent.toFixed(0)}`}
-            icon={<Fuel size={20} />}
+            value={!isReady ? "—" : `${cur.symbol}${stats.totalSpent.toFixed(0)}`}
+            icon={<Fuel size={16} />}
           />
           <StatCard
             label="Avg. Consumption"
-            value={!isReady ? "—" : `${stats.avgConsumption.toFixed(1)}`}
-            unit="L/100km"
-            icon={<Droplets size={20} />}
+            value={!isReady ? "—" : formatConsumption(stats.avgConsumption)}
+            unit={consumptionLabel}
+            icon={<Droplets size={16} />}
           />
           <StatCard
             label="Fill-ups"
             value={!isReady ? "—" : `${stats.entryCount}`}
-            icon={<Gauge size={20} />}
+            icon={<Gauge size={16} />}
           />
         </div>
 
@@ -188,15 +219,15 @@ export default function DashboardPage() {
                         })}
                       </p>
                       <p className="text-xs text-[var(--color-text-muted)]">
-                        {entry.odometer.toLocaleString()} km
+                        {entry.odometer.toLocaleString()} {distUnit}
                       </p>
                     </div>
                     <div className="text-right">
                       <p className="text-sm font-bold">
-                        ${entry.totalCost.toFixed(2)}
+                        {cur.symbol}{entry.totalCost.toFixed(2)}
                       </p>
                       <p className="text-xs text-[var(--color-text-muted)]">
-                        {entry.liters.toFixed(1)} L
+                        {entry.liters.toFixed(1)} {volUnit}
                       </p>
                     </div>
                   </Link>

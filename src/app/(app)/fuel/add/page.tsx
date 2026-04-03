@@ -9,8 +9,13 @@ import NumberStepper from "@/components/ui/NumberStepper";
 
 export default function AddFuelEntryPage() {
   const router = useRouter();
-  const { addEntry } = useFuelEntries();
+  const { addEntry, entries } = useFuelEntries();
   const { activeVehicle, vehicles } = useVehicles();
+
+  // Get the highest odometer reading from existing entries
+  const lastOdometer = entries.length > 0
+    ? Math.max(...entries.map((e) => e.odometer))
+    : activeVehicle?.odometer ?? 0;
 
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [odometer, setOdometer] = useState("");
@@ -19,14 +24,20 @@ export default function AddFuelEntryPage() {
   const [notes, setNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const parsedLiters = parseFloat(liters);
-  const parsedCost = parseFloat(totalCost);
+  const parse = (v: string) => parseFloat(v.replace(",", ".")) || 0;
+
+  const parsedLiters = parse(liters);
+  const parsedCost = parse(totalCost);
   const pricePerLiter =
     parsedLiters > 0 && parsedCost > 0 ? parsedCost / parsedLiters : 0;
 
+  const parsedOdometer = parse(odometer);
+  const odometerTooLow = parsedOdometer > 0 && parsedOdometer < lastOdometer;
+
   const isValid =
     date.length > 0 &&
-    parseFloat(odometer) > 0 &&
+    parsedOdometer > 0 &&
+    !odometerTooLow &&
     parsedLiters > 0 &&
     parsedCost > 0;
 
@@ -36,8 +47,9 @@ export default function AddFuelEntryPage() {
     setIsSubmitting(true);
 
     addEntry({
+      vehicleId: activeVehicle!.id,
       date,
-      odometer: parseFloat(odometer),
+      odometer: parsedOdometer,
       liters: parsedLiters,
       totalCost: parsedCost,
       notes: notes.trim() || undefined,
@@ -60,16 +72,16 @@ export default function AddFuelEntryPage() {
           <button
             type="button"
             onClick={() => router.back()}
-            className="rounded-xl p-1 transition-colors hover:bg-white/15"
+            className="-ml-2 rounded-xl p-1.5 transition-colors hover:bg-white/15"
             aria-label="Go back"
           >
-            <ChevronLeft size={24} className="text-white" />
+            <ChevronLeft size={22} className="text-white" />
           </button>
           <div>
-            <h1 className="text-xl font-extrabold text-white">Fuel Entry</h1>
+            <h1 className="text-xl font-extrabold text-white">Add Fuel Entry</h1>
             {activeVehicle ? (
-              <p className="text-sm font-medium text-white/70">
-                {activeVehicle.name}
+              <p className="mt-0.5 text-xs font-medium text-white/70">
+                {activeVehicle.year} {activeVehicle.make} {activeVehicle.model}
               </p>
             ) : null}
           </div>
@@ -96,15 +108,23 @@ export default function AddFuelEntryPage() {
           </div>
 
           {/* Odometer */}
-          <NumberStepper
-            id="odometer"
-            label="Odometer"
-            value={odometer}
-            onChange={setOdometer}
-            placeholder="e.g. 42350"
-            step={1}
-            unit="km"
-          />
+          <div>
+            <NumberStepper
+              id="odometer"
+              label="Odometer"
+              value={odometer}
+              onChange={setOdometer}
+              placeholder={lastOdometer > 0 ? `min ${lastOdometer.toLocaleString()}` : "e.g. 42350"}
+              step={1}
+              min={lastOdometer}
+              unit="km"
+            />
+            {odometerTooLow ? (
+              <p className="mt-1.5 text-xs font-medium text-[var(--color-danger)]">
+                Must be at least {lastOdometer.toLocaleString()} km (last reading)
+              </p>
+            ) : null}
+          </div>
 
           {/* Liters */}
           <NumberStepper

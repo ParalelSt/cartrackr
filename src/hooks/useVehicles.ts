@@ -46,14 +46,17 @@ export function useVehicles() {
   const activeVehicleId = isLoaded ? getActiveVehicleId() : null;
 
   const addVehicle = useCallback(
-    (data: Omit<Vehicle, "id" | "createdAt">) => {
+    (data: Omit<Vehicle, "id" | "createdAt">, setActive = false) => {
       const vehicle: Vehicle = {
         ...data,
         id: generateVehicleId(),
         createdAt: new Date().toISOString(),
       };
       saveVehicle(vehicle);
-      setActiveVehicleId(vehicle.id);
+      // Only auto-set active if it's the first vehicle or explicitly requested
+      if (setActive || getVehicles().length === 1) {
+        setActiveVehicleId(vehicle.id);
+      }
       notifyListeners();
       return vehicle;
     },
