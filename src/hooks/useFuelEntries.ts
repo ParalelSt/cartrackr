@@ -13,6 +13,7 @@ import { getActiveVehicleId } from "@/lib/vehicleStorage";
 
 let version = 0;
 const listeners = new Set<() => void>();
+let lastLocalWrite = 0; // timestamp of last local mutation
 
 function notifyListeners() {
   version++;
@@ -44,10 +45,13 @@ export function useFuelEntries() {
   const activeVehicleId = isLoaded ? getActiveVehicleId() : null;
   const hasSynced = useRef(false);
 
-  // Sync from API on mount
+  // Sync from API on mount (skip if a local write happened recently)
   useEffect(() => {
     if (hasSynced.current) return;
     hasSynced.current = true;
+
+    // If we just wrote locally, don't overwrite with stale server data
+    if (Date.now() - lastLocalWrite < 5000) return;
 
     fetch("/api/fuel")
       .then((r) => {
@@ -56,6 +60,8 @@ export function useFuelEntries() {
       })
       .then((data) => {
         if (!data) return;
+        // Double-check no local write happened while we were fetching
+        if (Date.now() - lastLocalWrite < 5000) return;
         localStorage.setItem("cartrackr_fuel_entries", JSON.stringify(data.entries));
         notifyListeners();
       })
@@ -81,6 +87,7 @@ export function useFuelEntries() {
         pricePerLiter: data.totalCost / data.liters,
       };
       saveFuelEntry(entry);
+      lastLocalWrite = Date.now();
       notifyListeners();
 
       // Sync to API
@@ -97,6 +104,7 @@ export function useFuelEntries() {
 
   const removeEntry = useCallback((id: string) => {
     deleteFuelEntry(id);
+    lastLocalWrite = Date.now();
     notifyListeners();
 
     // Sync to API

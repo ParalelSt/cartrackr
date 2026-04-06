@@ -10,6 +10,7 @@ import {
 
 let version = 0;
 const listeners = new Set<() => void>();
+let lastLocalWrite = 0;
 
 function notifyListeners() {
   version++;
@@ -40,10 +41,12 @@ export function useSettings() {
   const settings = isLoaded ? getSettings() : getSettings();
   const hasSynced = useRef(false);
 
-  // Sync from API on mount
+  // Sync from API on mount (skip if a local write happened recently)
   useEffect(() => {
     if (hasSynced.current) return;
     hasSynced.current = true;
+
+    if (Date.now() - lastLocalWrite < 5000) return;
 
     fetch("/api/settings")
       .then((r) => {
@@ -52,6 +55,7 @@ export function useSettings() {
       })
       .then((data) => {
         if (!data?.settings) return;
+        if (Date.now() - lastLocalWrite < 5000) return;
         saveSettings(data.settings);
         notifyListeners();
       })
@@ -62,6 +66,7 @@ export function useSettings() {
 
   const update = useCallback((partial: Partial<Settings>) => {
     const updated = updateSettings(partial);
+    lastLocalWrite = Date.now();
     notifyListeners();
 
     // Sync to API

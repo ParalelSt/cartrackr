@@ -14,6 +14,7 @@ import {
 
 let version = 0;
 const listeners = new Set<() => void>();
+let lastLocalWrite = 0;
 
 function notifyListeners() {
   version++;
@@ -46,10 +47,12 @@ export function useVehicles() {
   const activeVehicleId = isLoaded ? getActiveVehicleId() : null;
   const hasSynced = useRef(false);
 
-  // Sync from API on mount
+  // Sync from API on mount (skip if a local write happened recently)
   useEffect(() => {
     if (hasSynced.current) return;
     hasSynced.current = true;
+
+    if (Date.now() - lastLocalWrite < 5000) return;
 
     fetch("/api/vehicles")
       .then((r) => {
@@ -58,7 +61,7 @@ export function useVehicles() {
       })
       .then((data) => {
         if (!data) return;
-        // Replace localStorage with API data
+        if (Date.now() - lastLocalWrite < 5000) return;
         localStorage.setItem("cartrackr_vehicles", JSON.stringify(data.vehicles));
         if (data.activeVehicleId) {
           localStorage.setItem("cartrackr_active_vehicle", data.activeVehicleId);
@@ -82,6 +85,7 @@ export function useVehicles() {
       if (setActive || getVehicles().length === 1) {
         setActiveVehicleId(vehicle.id);
       }
+      lastLocalWrite = Date.now();
       notifyListeners();
 
       // Sync to API
@@ -98,6 +102,7 @@ export function useVehicles() {
 
   const removeVehicle = useCallback((id: string) => {
     deleteVehicle(id);
+    lastLocalWrite = Date.now();
     notifyListeners();
 
     // Sync to API
@@ -110,6 +115,7 @@ export function useVehicles() {
 
   const switchVehicle = useCallback((id: string) => {
     setActiveVehicleId(id);
+    lastLocalWrite = Date.now();
     notifyListeners();
 
     // Sync to API
