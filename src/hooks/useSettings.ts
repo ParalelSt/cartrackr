@@ -1,9 +1,10 @@
 "use client";
 
-import { useSyncExternalStore, useCallback } from "react";
+import { useSyncExternalStore, useCallback, useEffect, useRef } from "react";
 import {
   getSettings,
   updateSettings,
+  saveSettings,
   type Settings,
 } from "@/lib/settingsStorage";
 
@@ -37,10 +38,38 @@ export function useSettings() {
 
   const isLoaded = snapshot >= 0;
   const settings = isLoaded ? getSettings() : getSettings();
+  const hasSynced = useRef(false);
+
+  // Sync from API on mount
+  useEffect(() => {
+    if (hasSynced.current) return;
+    hasSynced.current = true;
+
+    fetch("/api/settings")
+      .then((r) => {
+        if (!r.ok) return null;
+        return r.json();
+      })
+      .then((data) => {
+        if (!data?.settings) return;
+        saveSettings(data.settings);
+        notifyListeners();
+      })
+      .catch(() => {
+        // Offline — use localStorage
+      });
+  }, []);
 
   const update = useCallback((partial: Partial<Settings>) => {
-    updateSettings(partial);
+    const updated = updateSettings(partial);
     notifyListeners();
+
+    // Sync to API
+    fetch("/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updated),
+    }).catch(() => {});
   }, []);
 
   return { settings, isLoaded, update };

@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import { ChevronLeft, Fuel, CarFront, Gauge, DollarSign, Droplets, TrendingUp } from "lucide-react";
 import { useFuelEntries } from "@/hooks/useFuelEntries";
 import { useVehicles } from "@/hooks/useVehicles";
+import { useSettings } from "@/hooks/useSettings";
+import { getCurrency } from "@/lib/currencies";
 
 function StatRow({ label, value, icon }: { label: string; value: string; icon: React.ReactNode }) {
   return (
@@ -21,6 +23,11 @@ export default function UsageStatsPage() {
   const router = useRouter();
   const { entries, allEntries, stats } = useFuelEntries();
   const { vehicles, activeVehicle } = useVehicles();
+  const { settings } = useSettings();
+  const curr = getCurrency(settings.currency);
+  const distUnit = settings.distanceUnit;
+  const volUnit = settings.volumeUnit;
+  const consumptionLabel = volUnit === "gal" ? "MPG" : `L/100${distUnit}`;
 
   // All-time stats across all vehicles
   const totalEntriesAllVehicles = allEntries.length;
@@ -62,8 +69,8 @@ export default function UsageStatsPage() {
           <div className="divide-y divide-[var(--color-border)]">
             <StatRow label="Vehicles" value={String(vehicles.length)} icon={<CarFront size={16} />} />
             <StatRow label="Total Fill-ups" value={String(totalEntriesAllVehicles)} icon={<Fuel size={16} />} />
-            <StatRow label="Total Spent" value={`$${totalSpentAll.toFixed(2)}`} icon={<DollarSign size={16} />} />
-            <StatRow label="Total Liters" value={`${totalLitersAll.toFixed(1)} L`} icon={<Droplets size={16} />} />
+            <StatRow label="Total Spent" value={`${curr.symbol}${totalSpentAll.toFixed(2)}`} icon={<DollarSign size={16} />} />
+            <StatRow label={`Total ${volUnit === "gal" ? "Gallons" : "Liters"}`} value={`${totalLitersAll.toFixed(1)} ${volUnit}`} icon={<Droplets size={16} />} />
           </div>
         </div>
 
@@ -75,12 +82,12 @@ export default function UsageStatsPage() {
             </h2>
             <div className="divide-y divide-[var(--color-border)]">
               <StatRow label="Fill-ups" value={String(stats.entryCount)} icon={<Fuel size={16} />} />
-              <StatRow label="Total Spent" value={`$${stats.totalSpent.toFixed(2)}`} icon={<DollarSign size={16} />} />
-              <StatRow label="Total Liters" value={`${stats.totalLiters.toFixed(1)} L`} icon={<Droplets size={16} />} />
-              <StatRow label="Distance Tracked" value={`${distanceTravelled.toLocaleString()} km`} icon={<Gauge size={16} />} />
-              <StatRow label="Avg Consumption" value={`${stats.avgConsumption.toFixed(1)} L/100km`} icon={<TrendingUp size={16} />} />
-              <StatRow label="Cost per km" value={`$${stats.costPerKm.toFixed(3)}`} icon={<DollarSign size={16} />} />
-              <StatRow label="Avg Price/L" value={`$${stats.avgCostPerLiter.toFixed(2)}`} icon={<Droplets size={16} />} />
+              <StatRow label="Total Spent" value={`${curr.symbol}${stats.totalSpent.toFixed(2)}`} icon={<DollarSign size={16} />} />
+              <StatRow label={`Total ${volUnit === "gal" ? "Gallons" : "Liters"}`} value={`${stats.totalLiters.toFixed(1)} ${volUnit}`} icon={<Droplets size={16} />} />
+              <StatRow label="Distance Tracked" value={`${distanceTravelled.toLocaleString()} ${distUnit}`} icon={<Gauge size={16} />} />
+              <StatRow label="Avg Consumption" value={`${stats.avgConsumption.toFixed(1)} ${consumptionLabel}`} icon={<TrendingUp size={16} />} />
+              <StatRow label={`Cost per ${distUnit}`} value={`${curr.symbol}${stats.costPerKm.toFixed(3)}`} icon={<DollarSign size={16} />} />
+              <StatRow label={`Avg Price/${volUnit}`} value={`${curr.symbol}${stats.avgCostPerLiter.toFixed(2)}`} icon={<Droplets size={16} />} />
             </div>
           </div>
         ) : null}

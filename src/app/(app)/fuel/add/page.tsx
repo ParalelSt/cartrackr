@@ -5,12 +5,18 @@ import { useRouter } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { useFuelEntries } from "@/hooks/useFuelEntries";
 import { useVehicles } from "@/hooks/useVehicles";
+import { useSettings } from "@/hooks/useSettings";
+import { getCurrency } from "@/lib/currencies";
 import NumberStepper from "@/components/ui/NumberStepper";
 
 export default function AddFuelEntryPage() {
   const router = useRouter();
   const { addEntry, entries } = useFuelEntries();
   const { activeVehicle, vehicles } = useVehicles();
+  const { settings } = useSettings();
+  const currency = getCurrency(settings.currency);
+  const distUnit = settings.distanceUnit;
+  const volUnit = settings.volumeUnit;
 
   // Get the highest odometer reading from existing entries
   const lastOdometer = entries.length > 0
@@ -117,11 +123,11 @@ export default function AddFuelEntryPage() {
               placeholder={lastOdometer > 0 ? `min ${lastOdometer.toLocaleString()}` : "e.g. 42350"}
               step={1}
               min={lastOdometer}
-              unit="km"
+              unit={distUnit}
             />
             {odometerTooLow ? (
               <p className="mt-1.5 text-xs font-medium text-[var(--color-danger)]">
-                Must be at least {lastOdometer.toLocaleString()} km (last reading)
+                Must be at least {lastOdometer.toLocaleString()} {distUnit} (last reading)
               </p>
             ) : null}
           </div>
@@ -129,12 +135,12 @@ export default function AddFuelEntryPage() {
           {/* Liters */}
           <NumberStepper
             id="liters"
-            label="Liters"
+            label={volUnit === "gal" ? "Gallons" : "Liters"}
             value={liters}
             onChange={setLiters}
             placeholder="e.g. 45.6"
             step={0.5}
-            unit="L"
+            unit={volUnit}
           />
 
           {/* Total Cost */}
@@ -145,7 +151,7 @@ export default function AddFuelEntryPage() {
             onChange={setTotalCost}
             placeholder="e.g. 72.50"
             step={1}
-            unit="$"
+            unit={currency.symbol}
             unitPosition="left"
           />
 
@@ -153,10 +159,10 @@ export default function AddFuelEntryPage() {
           {pricePerLiter > 0 ? (
             <div className="rounded-xl bg-blue-50 px-4 py-3 text-center">
               <span className="text-xs font-medium text-[var(--color-text-secondary)]">
-                Price per liter:{" "}
+                Price per {volUnit === "gal" ? "gallon" : "liter"}:{" "}
               </span>
               <span className="text-sm font-extrabold text-[var(--color-primary)]">
-                ${pricePerLiter.toFixed(3)}/L
+                {currency.symbol}{pricePerLiter.toFixed(3)}/{volUnit}
               </span>
             </div>
           ) : null}

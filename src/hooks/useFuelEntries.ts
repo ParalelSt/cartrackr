@@ -1,6 +1,6 @@
 "use client";
 
-import { useSyncExternalStore, useCallback, useMemo } from "react";
+import { useSyncExternalStore, useCallback, useMemo, useEffect, useRef } from "react";
 import {
   getFuelEntries,
   saveFuelEntry,
@@ -42,6 +42,27 @@ export function useFuelEntries() {
   const isLoaded = snapshot >= 0;
   const allEntries = isLoaded ? getFuelEntries() : [];
   const activeVehicleId = isLoaded ? getActiveVehicleId() : null;
+  const hasSynced = useRef(false);
+
+  // Sync from API on mount
+  useEffect(() => {
+    if (hasSynced.current) return;
+    hasSynced.current = true;
+
+    fetch("/api/fuel")
+      .then((r) => {
+        if (!r.ok) return null;
+        return r.json();
+      })
+      .then((data) => {
+        if (!data) return;
+        localStorage.setItem("cartrackr_fuel_entries", JSON.stringify(data.entries));
+        notifyListeners();
+      })
+      .catch(() => {
+        // Offline — use localStorage
+      });
+  }, []);
 
   // Filter entries for the active vehicle
   const entries = useMemo(
@@ -61,6 +82,14 @@ export function useFuelEntries() {
       };
       saveFuelEntry(entry);
       notifyListeners();
+
+      // Sync to API
+      fetch("/api/fuel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(entry),
+      }).catch(() => {});
+
       return entry;
     },
     [],
@@ -69,6 +98,13 @@ export function useFuelEntries() {
   const removeEntry = useCallback((id: string) => {
     deleteFuelEntry(id);
     notifyListeners();
+
+    // Sync to API
+    fetch("/api/fuel", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    }).catch(() => {});
   }, []);
 
   const stats = calculateFuelStats(entries);

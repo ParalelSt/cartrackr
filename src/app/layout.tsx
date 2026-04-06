@@ -3,6 +3,7 @@ import { Plus_Jakarta_Sans } from "next/font/google";
 import { auth0 } from "@/lib/auth0";
 import AuthProviderWrapper from "@/components/auth/AuthProviderWrapper";
 import ServiceWorkerRegistration from "@/components/pwa/ServiceWorkerRegistration";
+import UserSync from "@/components/auth/UserSync";
 import "./globals.css";
 
 const jakarta = Plus_Jakarta_Sans({
@@ -12,6 +13,7 @@ const jakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.APP_BASE_URL || "https://cartrackr.vercel.app"),
   title: "CarTrackr",
   description:
     "Track fuel costs, maintenance, and parts for your vehicles.",
@@ -20,6 +22,19 @@ export const metadata: Metadata = {
     capable: true,
     statusBarStyle: "black-translucent",
     title: "CarTrackr",
+  },
+  openGraph: {
+    title: "CarTrackr",
+    description: "Track fuel costs, maintenance, and parts for your vehicles.",
+    siteName: "CarTrackr",
+    type: "website",
+    images: [{ url: "/og-image.png", width: 1200, height: 630 }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "CarTrackr",
+    description: "Track fuel costs, maintenance, and parts for your vehicles.",
+    images: ["/og-image.png"],
   },
 };
 
@@ -50,6 +65,7 @@ export default async function RootLayout({
       <body className="h-full font-sans">
         <AuthProviderWrapper user={session?.user ?? undefined}>
           <ServiceWorkerRegistration />
+          <UserSync />
           {children}
         </AuthProviderWrapper>
       </body>
