@@ -105,13 +105,55 @@ export default function NotificationSettingsPage() {
   const handleEnableNotifications = async () => {
     if (!supported) return;
 
-    if (!granted) {
+    const turningOn = !settings.notificationsEnabled;
+
+    if (turningOn && !granted) {
       const result = await requestNotificationPermission();
       setPermission(getNotificationPermission());
       if (!result) return;
     }
 
-    update({ notificationsEnabled: !settings.notificationsEnabled });
+    update({ notificationsEnabled: turningOn });
+
+    // Subscribe or unsubscribe from push
+    if (turningOn) {
+      try {
+        const reg = await navigator.serviceWorker.ready;
+        const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+        if (!vapidKey) return;
+
+        let sub = await reg.pushManager.getSubscription();
+        if (!sub) {
+          sub = await reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: vapidKey,
+          });
+        }
+
+        await fetch("/api/push", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(sub.toJSON()),
+        });
+      } catch (err) {
+        console.error("Push subscription failed:", err);
+      }
+    } else {
+      try {
+        const reg = await navigator.serviceWorker.ready;
+        const sub = await reg.pushManager.getSubscription();
+        if (sub) {
+          await fetch("/api/push", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ endpoint: sub.endpoint }),
+          });
+          await sub.unsubscribe();
+        }
+      } catch (err) {
+        console.error("Push unsubscribe failed:", err);
+      }
+    }
   };
 
   const handleTestNotification = () => {
