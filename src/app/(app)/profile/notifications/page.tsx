@@ -5,12 +5,10 @@ import { useRouter } from "next/navigation";
 import { ChevronLeft, BellOff, BellRing } from "lucide-react";
 import { useSettings } from "@/hooks/useSettings";
 import {
-  isNotificationSupported,
   requestNotificationPermission,
   getNotificationPermission,
   showNotification,
 } from "@/lib/notifications";
-import NumberStepper from "@/components/ui/NumberStepper";
 
 function Toggle({
   enabled,
@@ -38,6 +36,54 @@ function Toggle({
         }`}
       />
     </button>
+  );
+}
+
+function DaysInput({
+  label,
+  value,
+  max,
+  fallback,
+  onCommit,
+}: {
+  label: string;
+  value: number;
+  max: number;
+  fallback: number;
+  onCommit: (v: number) => void;
+}) {
+  const [draft, setDraft] = useState(String(value));
+
+  // Keep draft in sync if value changes externally
+  useEffect(() => {
+    setDraft(String(value));
+  }, [value]);
+
+  const handleBlur = () => {
+    const parsed = parseInt(draft, 10);
+    const clamped = Number.isNaN(parsed) || parsed < 1 ? fallback : Math.min(parsed, max);
+    setDraft(String(clamped));
+    if (clamped !== value) onCommit(clamped);
+  };
+
+  return (
+    <div className="mt-3 flex items-center gap-3">
+      <span className="text-xs font-medium text-[var(--color-text-secondary)]">
+        {label}
+      </span>
+      <input
+        type="text"
+        inputMode="numeric"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value.replace(/[^0-9]/g, ""))}
+        onBlur={handleBlur}
+        onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+        className="w-16 rounded-xl border border-[var(--color-border)] px-3 py-2 text-center text-sm font-semibold outline-none transition-colors focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary)]/20"
+      />
+      <span className="text-xs font-medium text-[var(--color-text-secondary)]">
+        days
+      </span>
+    </div>
   );
 }
 
@@ -161,67 +207,27 @@ export default function NotificationSettingsPage() {
               />
             </div>
             {settings.fuelReminder && settings.notificationsEnabled && granted ? (
-              <div className="mt-3">
-                <NumberStepper
-                  id="fuelDays"
-                  label="Remind after (days)"
-                  value={String(settings.fuelReminderDays)}
-                  onChange={(v) =>
-                    update({
-                      fuelReminderDays: Math.max(1, Math.min(90, parseInt(v) || 14)),
-                    })
-                  }
-                  placeholder="14"
-                  step={1}
-                  min={1}
-                  unit="days"
-                />
-              </div>
+              <DaysInput
+                label="Remind after"
+                value={settings.fuelReminderDays}
+                max={90}
+                fallback={14}
+                onCommit={(v) => update({ fuelReminderDays: v })}
+              />
             ) : null}
           </div>
 
-          {/* Maintenance reminder */}
-          <div className="border-t border-[var(--color-border)] pt-4">
+          {/* Maintenance reminder — disabled until built */}
+          <div className="border-t border-[var(--color-border)] pt-4 opacity-50">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-semibold">Maintenance Reminder</p>
                 <p className="text-xs text-[var(--color-text-muted)]">
-                  Remind for scheduled service
+                  Coming soon
                 </p>
               </div>
-              <Toggle
-                enabled={settings.maintenanceReminder}
-                onToggle={() =>
-                  update({
-                    maintenanceReminder: !settings.maintenanceReminder,
-                  })
-                }
-                disabled={!settings.notificationsEnabled || !granted}
-              />
+              <Toggle enabled={false} onToggle={() => {}} disabled />
             </div>
-            {settings.maintenanceReminder &&
-            settings.notificationsEnabled &&
-            granted ? (
-              <div className="mt-3">
-                <NumberStepper
-                  id="maintDays"
-                  label="Remind after (days)"
-                  value={String(settings.maintenanceReminderDays)}
-                  onChange={(v) =>
-                    update({
-                      maintenanceReminderDays: Math.max(
-                        1,
-                        Math.min(365, parseInt(v) || 90),
-                      ),
-                    })
-                  }
-                  placeholder="90"
-                  step={1}
-                  min={1}
-                  unit="days"
-                />
-              </div>
-            ) : null}
           </div>
         </div>
 

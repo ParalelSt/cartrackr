@@ -65,7 +65,7 @@ export default function ConnectedDevicesPage() {
 
         <div className="rounded-2xl bg-white p-5 shadow-sm">
           <p className="text-sm text-[var(--color-text-secondary)]">
-            CarTrackr stores data locally on each device. To sync data between devices, use <span className="font-semibold">Export/Import</span> in Account Settings.
+            Your data is synced across all devices via the cloud. Sign in with the same account to access your vehicles and fuel logs anywhere.
           </p>
         </div>
       </div>

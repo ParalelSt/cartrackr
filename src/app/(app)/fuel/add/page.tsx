@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { useFuelEntries } from "@/hooks/useFuelEntries";
@@ -11,8 +11,8 @@ import NumberStepper from "@/components/ui/NumberStepper";
 
 export default function AddFuelEntryPage() {
   const router = useRouter();
-  const { addEntry, entries } = useFuelEntries();
-  const { activeVehicle, vehicles } = useVehicles();
+  const { activeVehicle, activeVehicleId, vehicles, isLoaded: vehiclesLoaded } = useVehicles();
+  const { addEntry, entries } = useFuelEntries(activeVehicleId);
   const { settings } = useSettings();
   const currency = getCurrency(settings.currency);
   const distUnit = settings.distanceUnit;
@@ -64,11 +64,12 @@ export default function AddFuelEntryPage() {
     router.push("/fuel");
   };
 
-  const noVehicle = vehicles.length === 0;
-  if (noVehicle) {
-    router.push("/garage/add");
-    return null;
-  }
+  const noVehicle = vehiclesLoaded && vehicles.length === 0;
+  useEffect(() => {
+    if (noVehicle) router.push("/garage/add");
+  }, [noVehicle, router]);
+
+  if (!vehiclesLoaded || noVehicle) return null;
 
   return (
     <div className="mx-auto max-w-lg">

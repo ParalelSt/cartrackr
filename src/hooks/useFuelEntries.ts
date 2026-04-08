@@ -1,73 +1,25 @@
 "use client";
 
-import { useSyncExternalStore, useCallback, useMemo, useEffect, useRef } from "react";
-import {
-  getFuelEntries,
-  saveFuelEntry,
-  deleteFuelEntry,
-  generateId,
-  calculateFuelStats,
-  type FuelEntry,
-} from "@/lib/fuelStorage";
-import { getActiveVehicleId } from "@/lib/vehicleStorage";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
+import { generateId, calculateFuelStats, type FuelEntry } from "@/lib/fuelStorage";
 
-let version = 0;
-const listeners = new Set<() => void>();
-let lastLocalWrite = 0; // timestamp of last local mutation
+export function useFuelEntries(activeVehicleId?: string | null) {
+  const [allEntries, setAllEntries] = useState<FuelEntry[]>([]);
+  const [isLoaded, setIsLoaded] = useState(false);
+  const hasFetched = useRef(false);
 
-function notifyListeners() {
-  version++;
-  listeners.forEach((l) => l());
-}
-
-function subscribe(listener: () => void) {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
-}
-
-function getSnapshot(): number {
-  return version;
-}
-
-function getServerSnapshot(): number {
-  return -1;
-}
-
-export function useFuelEntries() {
-  const snapshot = useSyncExternalStore(
-    subscribe,
-    getSnapshot,
-    getServerSnapshot,
-  );
-
-  const isLoaded = snapshot >= 0;
-  const allEntries = isLoaded ? getFuelEntries() : [];
-  const activeVehicleId = isLoaded ? getActiveVehicleId() : null;
-  const hasSynced = useRef(false);
-
-  // Sync from API on mount (skip if a local write happened recently)
+  // Fetch from API on mount
   useEffect(() => {
-    if (hasSynced.current) return;
-    hasSynced.current = true;
-
-    // If we just wrote locally, don't overwrite with stale server data
-    if (Date.now() - lastLocalWrite < 5000) return;
+    if (hasFetched.current) return;
+    hasFetched.current = true;
 
     fetch("/api/fuel")
-      .then((r) => {
-        if (!r.ok) return null;
-        return r.json();
-      })
+      .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
-        if (!data) return;
-        // Double-check no local write happened while we were fetching
-        if (Date.now() - lastLocalWrite < 5000) return;
-        localStorage.setItem("cartrackr_fuel_entries", JSON.stringify(data.entries));
-        notifyListeners();
+        if (data) setAllEntries(data.entries);
+        setIsLoaded(true);
       })
-      .catch(() => {
-        // Offline — use localStorage
-      });
+      .catch(() => setIsLoaded(true));
   }, []);
 
   // Filter entries for the active vehicle
@@ -86,11 +38,11 @@ export function useFuelEntries() {
         id: generateId(),
         pricePerLiter: data.totalCost / data.liters,
       };
-      saveFuelEntry(entry);
-      lastLocalWrite = Date.now();
-      notifyListeners();
 
-      // Sync to API
+      // Optimistic update
+      setAllEntries((prev) => [entry, ...prev]);
+
+      // Persist to API
       fetch("/api/fuel", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -103,11 +55,8 @@ export function useFuelEntries() {
   );
 
   const removeEntry = useCallback((id: string) => {
-    deleteFuelEntry(id);
-    lastLocalWrite = Date.now();
-    notifyListeners();
+    setAllEntries((prev) => prev.filter((e) => e.id !== id));
 
-    // Sync to API
     fetch("/api/fuel", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },

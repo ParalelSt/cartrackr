@@ -76,8 +76,8 @@ function groupByMonth(entries: FuelEntry[]): MonthGroup[] {
 }
 
 export default function FuelPage() {
-  const { entries, stats, isLoaded, removeEntry } = useFuelEntries();
-  const { activeVehicle } = useVehicles();
+  const { activeVehicle, activeVehicleId } = useVehicles();
+  const { entries, stats, isLoaded, removeEntry } = useFuelEntries(activeVehicleId);
   const { settings } = useSettings();
 
   const cur = getCurrency(settings.currency);
@@ -209,6 +209,11 @@ export default function FuelPage() {
                           </p>
                           <p>{cur.symbol}{entry.pricePerLiter.toFixed(2)}/{volUnit}</p>
                         </div>
+                        {entry.notes ? (
+                          <p className="mt-0.5 text-xs italic text-[var(--color-text-muted)]">
+                            {entry.notes}
+                          </p>
+                        ) : null}
                       </div>
                       <button
                         type="button"

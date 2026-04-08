@@ -6,7 +6,6 @@ import { useFuelEntries } from "@/hooks/useFuelEntries";
 import { useVehicles } from "@/hooks/useVehicles";
 import { useSettings } from "@/hooks/useSettings";
 import { checkAndFireFuelReminder, checkWeekendReminder } from "@/lib/notifications";
-import { migrateOrphanedEntries } from "@/lib/fuelStorage";
 import { getCurrency } from "@/lib/currencies";
 import {
   Plus,
@@ -51,8 +50,8 @@ function StatCard({
 }
 
 export default function DashboardPage() {
-  const { entries, stats, isLoaded } = useFuelEntries();
-  const { activeVehicle, vehicles, isLoaded: vehiclesLoaded } = useVehicles();
+  const { activeVehicle, activeVehicleId, vehicles, isLoaded: vehiclesLoaded } = useVehicles();
+  const { entries, stats, isLoaded } = useFuelEntries(activeVehicleId);
 
   const { settings } = useSettings();
   const cur = getCurrency(settings.currency);
@@ -71,12 +70,6 @@ export default function DashboardPage() {
   const isReady = isLoaded && vehiclesLoaded;
 
   const needsVehicle = isReady && vehicles.length === 0;
-
-  // Migrate old fuel entries (no vehicleId) to the first vehicle
-  useEffect(() => {
-    if (!isReady || vehicles.length === 0) return;
-    migrateOrphanedEntries(vehicles[0].id);
-  }, [isReady, vehicles]);
 
   // Check fuel reminder on load
   useEffect(() => {

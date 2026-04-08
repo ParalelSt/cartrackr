@@ -1,80 +1,40 @@
 "use client";
 
-import { useSyncExternalStore, useCallback, useEffect, useRef } from "react";
-import {
-  getSettings,
-  updateSettings,
-  saveSettings,
-  type Settings,
-} from "@/lib/settingsStorage";
-
-let version = 0;
-const listeners = new Set<() => void>();
-let lastLocalWrite = 0;
-
-function notifyListeners() {
-  version++;
-  listeners.forEach((l) => l());
-}
-
-function subscribe(listener: () => void) {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
-}
-
-function getSnapshot(): number {
-  return version;
-}
-
-function getServerSnapshot(): number {
-  return -1;
-}
+import { useState, useCallback, useEffect, useRef } from "react";
+import { DEFAULT_SETTINGS, type Settings } from "@/lib/settingsStorage";
 
 export function useSettings() {
-  const snapshot = useSyncExternalStore(
-    subscribe,
-    getSnapshot,
-    getServerSnapshot,
-  );
+  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+  const [isLoaded, setIsLoaded] = useState(false);
+  const hasFetched = useRef(false);
 
-  const isLoaded = snapshot >= 0;
-  const settings = isLoaded ? getSettings() : getSettings();
-  const hasSynced = useRef(false);
-
-  // Sync from API on mount (skip if a local write happened recently)
+  // Fetch from API on mount
   useEffect(() => {
-    if (hasSynced.current) return;
-    hasSynced.current = true;
-
-    if (Date.now() - lastLocalWrite < 5000) return;
+    if (hasFetched.current) return;
+    hasFetched.current = true;
 
     fetch("/api/settings")
-      .then((r) => {
-        if (!r.ok) return null;
-        return r.json();
-      })
+      .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
-        if (!data?.settings) return;
-        if (Date.now() - lastLocalWrite < 5000) return;
-        saveSettings(data.settings);
-        notifyListeners();
+        if (data?.settings) setSettings(data.settings);
+        setIsLoaded(true);
       })
-      .catch(() => {
-        // Offline — use localStorage
-      });
+      .catch(() => setIsLoaded(true));
   }, []);
 
   const update = useCallback((partial: Partial<Settings>) => {
-    const updated = updateSettings(partial);
-    lastLocalWrite = Date.now();
-    notifyListeners();
+    setSettings((prev) => {
+      const updated = { ...prev, ...partial };
 
-    // Sync to API
-    fetch("/api/settings", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(updated),
-    }).catch(() => {});
+      // Persist to API
+      fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updated),
+      }).catch(() => {});
+
+      return updated;
+    });
   }, []);
 
   return { settings, isLoaded, update };

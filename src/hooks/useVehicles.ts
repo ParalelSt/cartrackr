@@ -1,77 +1,33 @@
 "use client";
 
-import { useSyncExternalStore, useCallback, useEffect, useRef } from "react";
-import {
-  getVehicles,
-  saveVehicle,
-  deleteVehicle,
-  getActiveVehicle,
-  getActiveVehicleId,
-  setActiveVehicleId,
-  generateVehicleId,
-  type Vehicle,
-} from "@/lib/vehicleStorage";
-
-let version = 0;
-const listeners = new Set<() => void>();
-let lastLocalWrite = 0;
-
-function notifyListeners() {
-  version++;
-  listeners.forEach((l) => l());
-}
-
-function subscribe(listener: () => void) {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
-}
-
-function getSnapshot(): number {
-  return version;
-}
-
-function getServerSnapshot(): number {
-  return -1;
-}
+import { useState, useCallback, useEffect, useRef } from "react";
+import { type Vehicle } from "@/lib/vehicleStorage";
+import { generateVehicleId } from "@/lib/vehicleStorage";
 
 export function useVehicles() {
-  const snapshot = useSyncExternalStore(
-    subscribe,
-    getSnapshot,
-    getServerSnapshot,
-  );
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [activeVehicleId, setActiveVehicleId] = useState<string | null>(null);
+  const [isLoaded, setIsLoaded] = useState(false);
+  const hasFetched = useRef(false);
 
-  const isLoaded = snapshot >= 0;
-  const vehicles = isLoaded ? getVehicles() : [];
-  const activeVehicle = isLoaded ? getActiveVehicle() : null;
-  const activeVehicleId = isLoaded ? getActiveVehicleId() : null;
-  const hasSynced = useRef(false);
-
-  // Sync from API on mount (skip if a local write happened recently)
+  // Fetch from API on mount
   useEffect(() => {
-    if (hasSynced.current) return;
-    hasSynced.current = true;
-
-    if (Date.now() - lastLocalWrite < 5000) return;
+    if (hasFetched.current) return;
+    hasFetched.current = true;
 
     fetch("/api/vehicles")
-      .then((r) => {
-        if (!r.ok) return null;
-        return r.json();
-      })
+      .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
-        if (!data) return;
-        if (Date.now() - lastLocalWrite < 5000) return;
-        localStorage.setItem("cartrackr_vehicles", JSON.stringify(data.vehicles));
-        if (data.activeVehicleId) {
-          localStorage.setItem("cartrackr_active_vehicle", data.activeVehicleId);
+        if (data) {
+          setVehicles(data.vehicles);
+          if (data.activeVehicleId) setActiveVehicleId(data.activeVehicleId);
         }
-        notifyListeners();
+        setIsLoaded(true);
       })
-      .catch(() => {
-        // Offline — use localStorage
-      });
+      .catch(() => setIsLoaded(true));
   }, []);
+
+  const activeVehicle = vehicles.find((v) => v.id === activeVehicleId) ?? null;
 
   const addVehicle = useCallback(
     (data: Omit<Vehicle, "id" | "createdAt">, setActive = false) => {
@@ -80,15 +36,13 @@ export function useVehicles() {
         id: generateVehicleId(),
         createdAt: new Date().toISOString(),
       };
-      saveVehicle(vehicle);
-      // Only auto-set active if it's the first vehicle or explicitly requested
-      if (setActive || getVehicles().length === 1) {
-        setActiveVehicleId(vehicle.id);
-      }
-      lastLocalWrite = Date.now();
-      notifyListeners();
 
-      // Sync to API
+      // Optimistic update
+      const shouldSetActive = setActive || vehicles.length === 0;
+      setVehicles((prev) => [vehicle, ...prev]);
+      if (shouldSetActive) setActiveVehicleId(vehicle.id);
+
+      // Persist to API
       fetch("/api/vehicles", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -97,15 +51,12 @@ export function useVehicles() {
 
       return vehicle;
     },
-    [],
+    [vehicles.length],
   );
 
   const removeVehicle = useCallback((id: string) => {
-    deleteVehicle(id);
-    lastLocalWrite = Date.now();
-    notifyListeners();
+    setVehicles((prev) => prev.filter((v) => v.id !== id));
 
-    // Sync to API
     fetch("/api/vehicles", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
@@ -115,10 +66,7 @@ export function useVehicles() {
 
   const switchVehicle = useCallback((id: string) => {
     setActiveVehicleId(id);
-    lastLocalWrite = Date.now();
-    notifyListeners();
 
-    // Sync to API
     fetch("/api/vehicles", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },

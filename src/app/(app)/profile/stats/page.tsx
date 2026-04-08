@@ -21,8 +21,8 @@ function StatRow({ label, value, icon }: { label: string; value: string; icon: R
 
 export default function UsageStatsPage() {
   const router = useRouter();
-  const { entries, allEntries, stats } = useFuelEntries();
-  const { vehicles, activeVehicle } = useVehicles();
+  const { vehicles, activeVehicle, activeVehicleId } = useVehicles();
+  const { entries, allEntries, stats } = useFuelEntries(activeVehicleId);
   const { settings } = useSettings();
   const curr = getCurrency(settings.currency);
   const distUnit = settings.distanceUnit;

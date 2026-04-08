@@ -139,60 +139,43 @@ export default function AccountSettingsPage() {
           </h2>
           <button
             type="button"
-            onClick={() => {
-              const data = {
-                vehicles: localStorage.getItem("cartrackr_vehicles"),
-                fuelEntries: localStorage.getItem("cartrackr_fuel_entries"),
-                settings: localStorage.getItem("cartrackr_settings"),
-              };
-              const blob = new Blob([JSON.stringify(data, null, 2)], {
-                type: "application/json",
-              });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement("a");
-              a.href = url;
-              a.download = `cartrackr-backup-${new Date().toISOString().slice(0, 10)}.json`;
-              a.click();
-              URL.revokeObjectURL(url);
+            onClick={async () => {
+              try {
+                const [vehiclesRes, fuelRes] = await Promise.all([
+                  fetch("/api/vehicles").then((r) => r.json()),
+                  fetch("/api/fuel").then((r) => r.json()),
+                ]);
+
+                const vehicles = vehiclesRes.vehicles as { id: string; name: string; make: string; model: string; year: number }[];
+                const vehicleMap = new Map(vehicles.map((v) => [v.id, `${v.year} ${v.make} ${v.model}`]));
+
+                // Build CSV
+                const headers = ["Date", "Vehicle", "Odometer", "Liters", "Total Cost", "Price/L", "Notes"];
+                const rows = (fuelRes.entries as { vehicleId?: string; date: string; odometer: number; liters: number; totalCost: number; pricePerLiter: number; notes?: string }[]).map((e) => [
+                  e.date,
+                  vehicleMap.get(e.vehicleId ?? "") ?? "Unknown",
+                  e.odometer,
+                  e.liters,
+                  e.totalCost,
+                  e.pricePerLiter.toFixed(3),
+                  `"${(e.notes ?? "").replace(/"/g, '""')}"`,
+                ]);
+
+                const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+                const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `cartrackr-export-${new Date().toISOString().slice(0, 10)}.csv`;
+                a.click();
+                URL.revokeObjectURL(url);
+              } catch {
+                alert("Failed to export data.");
+              }
             }}
             className="w-full rounded-xl border border-[var(--color-border)] py-3 text-sm font-semibold text-[var(--color-text-secondary)] transition-colors hover:bg-gray-50 active:scale-[0.98]"
           >
-            Export Data
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              const input = document.createElement("input");
-              input.type = "file";
-              input.accept = ".json";
-              input.onchange = (e) => {
-                const file = (e.target as HTMLInputElement).files?.[0];
-                if (!file) return;
-                const reader = new FileReader();
-                reader.onload = () => {
-                  try {
-                    const data = JSON.parse(reader.result as string);
-                    if (data.vehicles)
-                      localStorage.setItem("cartrackr_vehicles", data.vehicles);
-                    if (data.fuelEntries)
-                      localStorage.setItem(
-                        "cartrackr_fuel_entries",
-                        data.fuelEntries,
-                      );
-                    if (data.settings)
-                      localStorage.setItem("cartrackr_settings", data.settings);
-                    window.location.reload();
-                  } catch {
-                    alert("Invalid backup file.");
-                  }
-                };
-                reader.readAsText(file);
-              };
-              input.click();
-            }}
-            className="w-full rounded-xl border border-[var(--color-border)] py-3 text-sm font-semibold text-[var(--color-text-secondary)] transition-colors hover:bg-gray-50 active:scale-[0.98]"
-          >
-            Import Data
+            Export Data (CSV)
           </button>
         </div>
       </div>
